@@ -1,10 +1,10 @@
 # Project Overview
-This project is an ETL (Extract, Transform, Load) pipeline implemented on AWS using Lambda, EventBridge, S3, and Glue. The pipeline is designed to fetch, transform and store the actual standings of the Premier League from [Football API](https://www.api-football.com/). The process is automated and is working on a scheduled basis.
+This project is an ETL (Extract, Transform, Load) pipeline implemented on AWS using Lambda, EventBridge, S3, and Redshift. The pipeline is designed to fetch, transform and store the actual standings of the Premier League from [Football API](https://www.api-football.com/). The process is automated and is working on a scheduled basis.
 
 <br>
 
 # Architecture
-In the project, we are implementing a three-stage data lake system. The purpose is to store raw, transformed and final data separately. This method ensures an organized and efficient management of data across all storage tiers.
+In the project, we are implementing a three-stage data lake system. The purpose is to store raw, transformed and final data separately. This method ensures organized and efficient data management across all storage tiers.
 ![Alt text](aws/architecture.png) 
 
 <br>
@@ -18,9 +18,8 @@ In the project, we are implementing a three-stage data lake system. The purpose 
 
 - **AWS Athena:** An interactive query service that makes it easy to query and analyze data directly in Amazon S3 using standard SQL.
 
-- **AWS Redshift:** A fully managed data warehouse.
+- **AWS Redshift:** A fully managed, fast, and scalable data warehouse solution with high performance querying and analytics capabilities.
 
-<br>
 <br>
 
 # Extract
@@ -37,13 +36,11 @@ The first Lambda function in our ETL pipeline, triggered by EventBridge on a pre
 
 <br>
 
-![Alt td](aws/lambda-1.png)
+![](aws/lambda-1.png)
 
-![Alt text](image.png)
+![](aws/image.png)
 
-![Alt text](aws/eventbridge.bmp)
-
-
+![](aws/eventbridge.bmp)
 
 <br>
 
@@ -59,7 +56,7 @@ import pandas as pd
 
 def lambda_handler(event, context):
     # Access the API key from the environment variables
-    api_key = os.enaviron.get('API_KEY')
+    api_key = os.environ.get('API_KEY')
 
     # API endpoint and headers
     url = "https://v3.football.api-sports.io/standings?league=39&season=2023"
@@ -149,7 +146,7 @@ If we attempt to query our data with Athena, it results in an error because Athe
 
 <br>
 
-### The added timestamp in the filename provides a chronological reference point. By comparing these timestamps, the Lambda function can easily identify and choose the most recently added file to convert. The parquet file is uploaded to **"plstandings-parquet"** bucket.
+The added timestamp in the filename provides a chronological reference point. By comparing these timestamps, the Lambda function can easily identify and choose the most recently added file to convert. The parquet file is uploaded to **"plstandings-parquet"** bucket.
 
 ```python
 import boto3
@@ -216,8 +213,7 @@ def lambda_handler(event, context):
         response_message = f"Error: {e}"
         print(response_message)
     
-    return response_message    
-                 
+    return response_message                     
 ```
 <br>
 <br>
@@ -226,15 +222,11 @@ def lambda_handler(event, context):
 
 ![Alt text](aws/athena1.bmp)![Alt text](aws/athena2.png)
 
+With the third Lambda function in our workflow, we focus on optimizing the raw data for analysis. The transformation involves dropping unnecessary columns, adjusting their order and creating a new column derived from an existing one. We are also changing the periods in column names to underscores to prevent potential syntax issues when working with databases.
 
+The new **form_points** column represents the points earned by a team in its 5 previous matches. It is derived from the existing **form** column, which represents the results as a string of characters like **"WLWWD"**, where "W","L" and "D" indicate wins, losses and draws. The function maps these outcomes to 3, 0 and 1 points respectively and sums them to compute the total points.
 
-### With the third Lambda function in our workflow, we focus on optimizing the raw data for analysis. The transformation involves dropping unnecessary columns, adjusting their order and creating a new column derived from an existing one. We are also changing the periods in column names to underscores to prevent potential syntax issues when working with databases.
-
-<br>
-
-### The new **"form_points"** column represents the points earned by a team in its 5 previous matches. It is derived from the existing **"form"** column, which represents the results as a string of characters like **WLWWD**, where "W","L" and "D" indicate wins, losses and draws. The function maps these outcomes to 3, 0 and 1 points respectively and sums them to compute the total points.
-
-<br>
+The function is triggered by the second S3 bucket when the Parquet file updloaded.
 
 ```python
 import awswrangler as wr
@@ -312,8 +304,9 @@ def lambda_handler(event, context):
         print(response_message)
 
     return response_message
-
 ```
+<br>
+
 # Load
-Concluding our pipeline, we are going to store our transformed data in Redshift, granting easy access for querying and analysis.
+Concluding our pipeline, we are going to store our final data in Redshift, granting easy access to perform data analysis and queries.
 ![Alt text](aws/redshift.bmp)
